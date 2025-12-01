@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nano Banana Pro - Chat Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        :root {
+            --banana-yellow: #FFE135;
+            --banana-dark: #121212;
+            --banana-panel: #1E1E1E;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--banana-dark);
+            color: white;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #111; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--banana-yellow); }
+
+        .btn-main {
+            background: var(--banana-yellow);
+            color: black;
+            font-weight: 800;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+        .btn-main:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 225, 53, 0.3);
+        }
+        .btn-main:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+
+        .upload-zone {
+            border: 1px dashed #444;
+            background: #151515;
+            transition: all 0.2s;
+        }
+        .upload-zone.active {
+            border-color: var(--banana-yellow);
+            background: #1a1a1a;
+        }
+
+        /* Console styling */
+        .console-line {
+            padding: 4px 0;
+            border-bottom: 1px solid #222;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        .console-user { color: #aaa; }
+        .console-sys { color: var(--banana-yellow); }
+        .console-thought { color: #00ffcc; font-style: italic; } 
+        .console-err { color: #ff5555; }
+        
+        /* Toggle Switch */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #FFE135;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #FFE135;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden text-sm">
+
+    <!-- Header -->
+    <header class="h-14 border-b border-gray-800 bg-[#0A0A0A] flex items-center justify-between px-4 shrink-0 z-20">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-yellow-400 rounded flex items-center justify-center text-black font-bold shadow-lg">
+                <i class="fa-solid fa-camera-retro"></i>
+            </div>
+            <div>
+                <h1 class="font-bold tracking-tight text-white">NANO BANANA <span class="text-yellow-400">REALISM</span></h1>
+                <p class="text-[10px] text-gray-500 mono leading-none">GEMINI 3.0 PRO ENGINE</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 text-[10px] font-mono text-gray-500">
+            <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            RAW MODE READY
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Sidebar: Configuration -->
+        <aside class="w-80 bg-[#141414] border-r border-gray-800 flex flex-col z-10 shrink-0">
+            <div class="p-4 space-y-5 flex-1 overflow-y-auto">
+                
+                <!-- API Key Input -->
+                <div class="space-y-2 pb-4 border-b border-gray-800">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase">Custom API Key (Optional)</label>
+                    <div class="relative">
+                        <input type="password" id="customKey" class="w-full bg-[#0A0A0A] border border-gray-700 rounded p-2 text-xs text-yellow-400 focus:border-yellow-400 outline-none placeholder-gray-700" placeholder="Paste AIza... key here">
+                        <i class="fa-solid fa-key absolute right-3 top-2.5 text-gray-600 text-xs"></i>
+                    </div>
+                </div>
+
+                <!-- Reference Image Input -->
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs font-bold text-gray-400 uppercase">Reference Signal</label>
+                        <span id="refBadge" class="text-[10px] bg-gray-800 text-gray-400 px-1.5 rounded hidden">LOADED</span>
+                    </div>
+                    
+                    <div id="dropZone" class="upload-zone h-36 rounded-lg relative flex flex-col items-center justify-center cursor-pointer group">
+                        <input type="file" id="refInput" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" accept="image/*">
+                        
+                        <!-- Empty State -->
+                        <div id="uploadEmpty" class="text-center pointer-events-none transition-opacity duration-200">
+                            <i class="fa-solid fa-image text-gray-600 text-2xl mb-2 group-hover:text-yellow-400"></i>
+                            <p class="text-[10px] text-gray-500">Click or Drag Reference Image</p>
+                        </div>
+
+                        <!-- Preview State -->
+                        <div id="uploadPreview" class="absolute inset-0 hidden bg-[#000] z-10 w-full h-full">
+                            <img id="refImg" class="w-full h-full object-contain opacity-80">
+                            <button onclick="resetImage(event)" class="absolute top-1 right-1 bg-red-500/90 text-white w-6 h-6 rounded flex items-center justify-center hover:bg-red-600 z-30 shadow-md">
+                                <i class="fa-solid fa-times text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Text Prompt -->
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-gray-400 uppercase">Instruction</label>
+                    <textarea id="prompt" class="w-full bg-[#0A0A0A] border border-gray-700 rounded p-3 text-gray-200 focus:border-yellow-400 outline-none resize-none h-24 text-xs leading-relaxed" placeholder="e.g. Change the background to a city street, keep the person exactly the same..."></textarea>
+                </div>
+
+                <!-- Thinking Model Toggle -->
+                <div class="flex items-center justify-between p-3 bg-[#0A0A0A] border border-gray-700 rounded-lg">
+                    <div class="flex flex-col">
+                        <span class="text-xs font-bold text-gray-300">Texture Agent</span>
+                        <span class="text-[10px] text-gray-500">Prevents "plastic" smoothing</span>
+                    </div>
+                    <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                        <input type="checkbox" name="toggle" id="reasoningToggle" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-[#111] checked:right-0 checked:border-yellow-400"/>
+                        <label for="reasoningToggle" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-700 cursor-pointer checked:bg-yellow-400"></label>
+                    </div>
+                </div>
+
+                <!-- Parameters -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label class="text-[10px] text-gray-500 font-bold">SIZE</label>
+                        <select id="size" class="w-full bg-[#0A0A0A] border border-gray-700 text-gray-300 text-xs rounded p-2 outline-none hover:border-gray-500 focus:border-yellow-400 transition-colors">
+                            <option value="1024x1024">1024 x 1024 (Standard)</option>
+                            <option value="2048x2048">2048 x 2048 (2K Upscale)</option>
+                            <option value="1080x1920" selected>1080 x 1920 (9:16 Portrait)</option>
+                            <option value="1920x1080">1920 x 1080 (16:9 Landscape)</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] text-gray-500 font-bold">STYLE</label>
+                        <select id="style" class="w-full bg-[#0A0A0A] border border-gray-700 text-gray-300 text-xs rounded p-2 outline-none hover:border-gray-500 focus:border-yellow-400 transition-colors">
+                            <option value="Hyper-Realistic" selected>Hyper-Realistic (Raw Photo)</option>
+                            <option value="Film Look">Film Look (Kodak Portra)</option>
+                            <option value="Cinematic">Cinematic (Dramatic)</option>
+                            <option value="Cartoon">Cartoon (Vibrant)</option>
+                            <option value="3D Render">3D Render (Octane)</option>
+                            <option value="Anime">Anime (Standard)</option>
+                            <option value="Studio Ghibli">Studio Ghibli (Hand Drawn)</option>
+                            <option value="">None (Raw)</option>
+                        </select>
+                    </div>
+                    <div class="space-y-1 col-span-2">
+                        <label class="text-[10px] text-gray-500 font-bold">TEXTURE QUALITY</label>
+                        <select id="quality" class="w-full bg-[#0A0A0A] border border-gray-700 text-gray-300 text-xs rounded p-2 outline-none hover:border-gray-500 focus:border-yellow-400 transition-colors">
+                            <option value="Ultra-Detailed">Ultra-Detailed (Texture Focus)</option>
+                            <option value="Standard">Standard</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Generate Button -->
+            <div class="p-4 border-t border-gray-800 bg-[#111]">
+                <button id="runBtn" class="btn-main w-full py-3 rounded text-sm font-bold flex items-center justify-center gap-2">
+                    <span>GENERATE RAW</span>
+                    <i class="fa-solid fa-camera"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content: Canvas & Console -->
+        <main class="flex-1 flex flex-col bg-[#050505] relative min-w-0">
+            
+            <!-- Canvas Viewer -->
+            <div class="flex-1 flex items-center justify-center p-6 relative overflow-hidden bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9IiMzMzMiLz48L3N2Zz4=')]">
+                
+                <div id="loader" class="absolute inset-0 bg-black/80 z-20 hidden flex flex-col items-center justify-center">
+                    <div class="w-16 h-16 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <p id="loaderText" class="text-yellow-400 font-mono text-xs animate-pulse mt-4">INITIALIZING...</p>
+                </div>
+
+                <div id="placeholder" class="text-center opacity-30 select-none">
+                    <i class="fa-solid fa-cube text-6xl mb-4"></i>
+                    <p class="mono text-xs">NO OUTPUT GENERATED</p>
+                </div>
+
+                <canvas id="canvas" class="hidden shadow-2xl border border-gray-800 max-w-full max-h-full"></canvas>
+                
+                <!-- Toolbar overlay -->
+                <div class="absolute top-4 right-4 flex gap-2">
+                    <button onclick="download()" class="bg-black/60 hover:bg-white/20 text-white p-2 rounded backdrop-blur border border-white/10 transition-colors" title="Download">
+                        <i class="fa-solid fa-download"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Neural Console (Chat Log) -->
+            <div class="h-48 bg-[#0a0a0a] border-t border-gray-800 flex flex-col shrink-0">
+                <div class="h-8 border-b border-gray-800 flex items-center px-3 bg-[#111] justify-between">
+                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mono">Neural Console</span>
+                    <button onclick="clearConsole()" class="text-[10px] text-gray-600 hover:text-white">CLEAR</button>
+                </div>
+                <div id="consoleLog" class="flex-1 overflow-y-auto p-3 font-mono text-xs space-y-1">
+                    <div class="console-line console-sys">> System initialized. Realism Engine Active.</div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // --- State ---
+        const apiKey = ""; // System default
+        let refImageBase64 = null;
+        let refMimeType = null;
+
+        // --- Elements ---
+        const els = {
+            customKey: document.getElementById('customKey'),
+            refInput: document.getElementById('refInput'),
+            dropZone: document.getElementById('dropZone'),
+            uploadEmpty: document.getElementById('uploadEmpty'),
+            uploadPreview: document.getElementById('uploadPreview'),
+            refImg: document.getElementById('refImg'),
+            refBadge: document.getElementById('refBadge'),
+            prompt: document.getElementById('prompt'),
+            runBtn: document.getElementById('runBtn'),
+            canvas: document.getElementById('canvas'),
+            ctx: document.getElementById('canvas').getContext('2d'),
+            placeholder: document.getElementById('placeholder'),
+            loader: document.getElementById('loader'),
+            loaderText: document.getElementById('loaderText'),
+            console: document.getElementById('consoleLog'),
+            size: document.getElementById('size'),
+            style: document.getElementById('style'),
+            quality: document.getElementById('quality'),
+            reasoningToggle: document.getElementById('reasoningToggle')
+        };
+
+        // --- Helper: Get API Key ---
+        function getKey() {
+            const userKey = els.customKey.value.trim();
+            if (userKey) return userKey;
+            return apiKey;
+        }
+
+        // --- Logger ---
+        function log(msg, type = 'sys') {
+            const div = document.createElement('div');
+            div.className = `console-line console-${type}`;
+            div.textContent = type === 'thought' ? `🤔 AGENT: ${msg}` : `> ${msg}`;
+            els.console.appendChild(div);
+            els.console.scrollTop = els.console.scrollHeight;
+        }
+
+        window.clearConsole = () => {
+            els.console.innerHTML = '<div class="console-line console-sys">> Console cleared.</div>';
+        }
+
+        // --- File Handling ---
+        els.refInput.addEventListener('change', e => processFile(e.target.files[0]));
+        els.dropZone.addEventListener('dragover', e => { e.preventDefault(); els.dropZone.classList.add('active'); });
+        els.dropZone.addEventListener('dragleave', e => { els.dropZone.classList.remove('active'); });
+        els.dropZone.addEventListener('drop', e => { e.preventDefault(); els.dropZone.classList.remove('active'); processFile(e.dataTransfer.files[0]); });
+
+        function processFile(file) {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                const img = new Image();
+                img.onload = () => {
+                    const maxDim = 1536; 
+                    let w = img.width, h = img.height;
+                    if (w > maxDim || h > maxDim) {
+                        const ratio = Math.min(maxDim / w, maxDim / h);
+                        w = Math.floor(w * ratio);
+                        h = Math.floor(h * ratio);
+                    }
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = w;
+                    tempCanvas.height = h;
+                    const ctx = tempCanvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    
+                    const optimizedDataUrl = tempCanvas.toDataURL('image/jpeg', 0.95);
+                    refImageBase64 = optimizedDataUrl.split(',')[1];
+                    refMimeType = 'image/jpeg';
+                    
+                    els.refImg.src = optimizedDataUrl;
+                    els.uploadEmpty.classList.add('hidden');
+                    els.uploadPreview.classList.remove('hidden');
+                    els.refBadge.classList.remove('hidden');
+                    log(`Reference loaded. Optimized to ${w}x${h} for analysis.`, "sys");
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        window.resetImage = (e) => {
+            if(e) { e.preventDefault(); e.stopPropagation(); }
+            refImageBase64 = null;
+            els.refInput.value = '';
+            els.uploadPreview.classList.add('hidden');
+            els.uploadEmpty.classList.remove('hidden');
+            els.refBadge.classList.add('hidden');
+            log("Reference cleared.", "sys");
+        };
+
+        // --- Main Execution Flow ---
+        els.runBtn.addEventListener('click', async () => {
+            const promptText = els.prompt.value.trim();
+            if (!promptText && !refImageBase64) return log("Error: Please provide prompt or image.", "err");
+            if (els.runBtn.disabled) return;
+
+            els.runBtn.disabled = true;
+            els.loader.classList.remove('hidden');
+
+            try {
+                // 1. Construct Style/Quality Keywords
+                const styleVal = els.style.value;
+                const qualityVal = els.quality.value;
+                const sizeVal = els.size.value;
+
+                // Determine aspect ratio hint for the AI prompt
+                let aspectPrompt = "";
+                if (sizeVal.includes("1080x1920")) aspectPrompt = ", portrait orientation, tall aspect ratio";
+                if (sizeVal.includes("1920x1080")) aspectPrompt = ", landscape orientation, wide aspect ratio";
+
+                
+                // Advanced Prompt Engineering
+                let promptModifiers = "";
+                // Existing Styles
+                if (styleVal === "Hyper-Realistic") promptModifiers += ", raw photo, dslr, soft lighting, authentic texture, film grain, f/1.8, bokeh";
+                if (styleVal === "Film Look") promptModifiers += ", kodak portra 400, analog film, grain, vintage warmth";
+                if (styleVal === "Cinematic") promptModifiers += ", movie still, anamorphic lens, color graded, dramatic lighting";
+                // New Styles
+                if (styleVal === "Cartoon") promptModifiers += ", cartoon style, vibrant colors, cel shaded, smooth lines, 2d animation, expressive";
+                if (styleVal === "3D Render") promptModifiers += ", 3d render, unreal engine 5, octane render, ray tracing, highly detailed, global illumination";
+                if (styleVal === "Anime") promptModifiers += ", anime style, japanese animation, vibrant, high quality drawing, detailed background";
+                if (styleVal === "Studio Ghibli") promptModifiers += ", studio ghibli style, hayao miyazaki, watercolor background, detailed, whimsical, hand drawn";
+
+                if (qualityVal === "Ultra-Detailed") promptModifiers += ", 8k, highly detailed, sharp focus, pore-level detail, imperfection, realistic skin texture";
+
+                // Add aspect hint
+                promptModifiers += aspectPrompt;
+
+                let imgData;
+
+                if (refImageBase64) {
+                    if (els.reasoningToggle.checked) {
+                        // Step A: Reasoning (Texture Preservation)
+                        els.loaderText.textContent = "ANALYZING TEXTURES...";
+                        log("Texture Agent analyzing input...", "sys");
+                        
+                        const thoughtPrompt = await callGeminiReasoning(promptText, styleVal); 
+                        log(`Agent Strategy: "${thoughtPrompt}"`, "thought");
+                        
+                        // Step B: Generation
+                        els.loaderText.textContent = "RENDERING RAW...";
+                        // Adjust prompt based on style: if cartoon/anime, don't force 'organic textures' as much as realism
+                        let textureInstruction = "";
+                        if (["Cartoon", "3D Render", "Anime", "Studio Ghibli"].includes(styleVal)) {
+                             textureInstruction = "Ensure style consistency.";
+                        } else {
+                             textureInstruction = "Avoid plastic look, avoid smooth skin, keep organic textures.";
+                        }
+
+                        const enhancedPrompt = `${thoughtPrompt} ${promptModifiers}. ${textureInstruction}`;
+                        imgData = await callGeminiImageGen(enhancedPrompt);
+
+                    } else {
+                        // Direct Mode
+                        els.loaderText.textContent = "PROCESSING...";
+                        const finalPrompt = `${promptText} ${promptModifiers}`;
+                        imgData = await callGeminiImageGen(finalPrompt);
+                    }
+                } else {
+                    // Text Only
+                    els.loaderText.textContent = "SYNTHESIZING...";
+                    const finalPrompt = `${promptText} ${promptModifiers}`;
+                    imgData = await callImagen(finalPrompt);
+                }
+
+                await render(imgData);
+                log("Render complete.", "sys");
+
+            } catch (err) {
+                log(`Error: ${err.message}`, "err");
+                console.error(err);
+            } finally {
+                els.runBtn.disabled = false;
+                els.loader.classList.add('hidden');
+            }
+        });
+
+        // --- Step 1: Reasoning Agent (Gemini Flash Text) ---
+        async function callGeminiReasoning(userUserPrompt, styleMode) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${getKey()}`;
+            
+            // STRICT INSTRUCTION TO PREVENT PLASTIC LOOK
+            const systemPrompt = `You are a professional photographer/artist editing an image.
+            Analyze the attached image. The user wants to modify it: "${userUserPrompt}".
+            
+            Task: Write a prompt for the image generator.
+            1. Describe the scene/subject to keep.
+            2. Describe the changes.
+            3. ADD SPECIFIC INSTRUCTIONS to preserve texture/style.
+            
+            Style requested: ${styleMode || "Natural"}.
+            Output ONLY the prompt text.`;
+
+            const payload = {
+                contents: [{
+                    role: "user",
+                    parts: [
+                        { text: systemPrompt },
+                        { inlineData: { mimeType: refMimeType, data: refImageBase64 } }
+                    ]
+                }]
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) throw new Error("Reasoning Agent Failed");
+            const data = await response.json();
+            return data.candidates[0].content.parts[0].text.trim();
+        }
+
+        // --- Step 2: Image Generation ---
+        async function callGeminiImageGen(optimizedPrompt) {
+            // Using the user-requested model
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent?key=${getKey()}`;
+            
+            const payload = {
+                contents: [{
+                    role: "user",
+                    parts: [
+                        { text: optimizedPrompt },
+                        { inlineData: { mimeType: refMimeType, data: refImageBase64 } }
+                    ]
+                }],
+                generationConfig: { responseModalities: ["IMAGE"] }
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error?.message || "Image Gen Failed (Auth or Model Issue)");
+            }
+            
+            const data = await response.json();
+            const part = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+            if (!part) throw new Error("Model generated text only. Refine prompt.");
+            return part.inlineData.data;
+        }
+
+        // --- Fallback (Imagen) ---
+        async function callImagen(prompt) {
+            log("No reference. Using Text-to-Image.", "sys");
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${getKey()}`;
+            const payload = {
+                instances: [{ prompt: prompt }],
+                parameters: { sampleCount: 1 }
+            };
+
+            const res = await fetch(url, { method: 'POST', body: JSON.stringify(payload), headers: {'Content-Type': 'application/json'} });
+            if(!res.ok) throw new Error("Imagen API Error");
+            const data = await res.json();
+            return data.predictions[0].bytesBase64Encoded;
+        }
+
+        // --- Rendering ---
+        function render(b64) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    const sizeVal = els.size.value;
+                    let targetW, targetH;
+
+                    if (sizeVal.includes('x')) {
+                         const parts = sizeVal.split('x');
+                         targetW = parseInt(parts[0]);
+                         targetH = parseInt(parts[1]);
+                    } else {
+                         targetW = parseInt(sizeVal);
+                         targetH = parseInt(sizeVal);
+                    }
+                    
+                    els.canvas.width = targetW;
+                    els.canvas.height = targetH;
+                    
+                    els.ctx.fillStyle = 'black';
+                    els.ctx.fillRect(0,0, targetW, targetH);
+                    
+                    els.ctx.imageSmoothingEnabled = true;
+                    els.ctx.imageSmoothingQuality = 'high';
+                    
+                    // Maintain aspect ratio, center image
+                    const scale = Math.min(targetW/img.width, targetH/img.height);
+                    const x = (targetW - img.width * scale) / 2;
+                    const y = (targetH - img.height * scale) / 2;
+                    
+                    els.ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+                    
+                    els.canvas.classList.remove('hidden');
+                    els.placeholder.classList.add('hidden');
+                    
+                    log(`Rendered at ${targetW}x${targetH}`, "sys");
+                    resolve();
+                };
+                img.onerror = reject;
+                img.src = `data:image/png;base64,${b64}`;
+            });
+        }
+
+        // --- FIXED DOWNLOAD FUNCTION ---
+        function download() {
+            els.canvas.toBlob((blob) => {
+                if (!blob) return;
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.download = `nano-raw-${Date.now()}.png`;
+                link.href = url;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 'image/png', 1.0);
+        }
+
+        log("Realism Engine Online.", "sys");
+
+    </script>
+</body>
+</html>
