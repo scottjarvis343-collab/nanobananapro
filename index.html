@@ -159,7 +159,8 @@
                         <select id="size" class="w-full bg-[#0A0A0A] border border-gray-700 text-gray-300 text-xs rounded p-2 outline-none hover:border-gray-500 focus:border-yellow-400 transition-colors">
                             <option value="1024x1024">1024 x 1024 (Standard)</option>
                             <option value="2048x2048">2048 x 2048 (2K Upscale)</option>
-                            <option value="1080x1920" selected>1080 x 1920 (9:16 Portrait)</option>
+                            <option value="1080x1920">1080 x 1920 (9:16 Portrait)</option>
+                            <option value="1080x1440" selected>1080 x 1440 (3:4 Portrait)</option>
                             <option value="1920x1080">1920 x 1080 (16:9 Landscape)</option>
                         </select>
                     </div>
@@ -352,6 +353,7 @@
                 // Determine aspect ratio hint for the AI prompt
                 let aspectPrompt = "";
                 if (sizeVal.includes("1080x1920")) aspectPrompt = ", portrait orientation, tall aspect ratio";
+                if (sizeVal.includes("1080x1440")) aspectPrompt = ", portrait orientation, 3:4 aspect ratio";
                 if (sizeVal.includes("1920x1080")) aspectPrompt = ", landscape orientation, wide aspect ratio";
 
                 
